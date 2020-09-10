@@ -1,4 +1,4 @@
-# [fuba's](https://github.com/fubaBfA) Reputation Expand/Collapse Button
+# [fuba's](https://github.com/fubaWoW) Reputation Expand/Collapse Button
 
 This AddOn adds an Expand/Collapse Button to Expand/Collapse ALL Reputations with one click!
 
