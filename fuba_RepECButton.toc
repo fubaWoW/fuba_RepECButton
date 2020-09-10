@@ -1,0 +1,8 @@
+﻿## Interface: 80300
+## Title: fuba's |cff0080ffReputation Expand/Collapse Button|r
+## Version: @project-version@
+## Author: fuba
+## Notes: Adds an Expand/Collapse Button to Expand/Collapse ALL Reputations with one click!
+
+# Core files
+fuba_RepECButton.lua
