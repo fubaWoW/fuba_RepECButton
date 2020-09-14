@@ -1,15 +1,15 @@
 ﻿local addonName = ...
 if not ReputationFrame then return end -- do not load addon if there is no ReputationFrame
-if NUM_FACTIONS_DISPLAYED < 2 then return end -- do not load addon if there are no Repuations (in case of... anything ^^)
+local numFactions = 0
+
+-- reduce global shown faction by 1 because it is relplaced by our button
+NUM_FACTIONS_DISPLAYED = 14
 
 -- MAYBE later in settings
 local CollapsOnShow = false
 
--- Global Button Name
-local ButtonName = "ReputationExpandOrCollapseButtonAll"
-
--- Backup Original Regions for ReputationBar1
-local RB1_point, RB1_relativeTo, RB1_relativePoint, RB1_xOfs, RB1_yOfs = ReputationBar1:GetPoint()
+-- Button
+local ButtonName = "ReputationExpandOrCollapseAllButton"
 
 -- function to check if Value is Numeric Value
 local function IsNumeric(value)
@@ -26,10 +26,28 @@ local function IsNumeric(value)
   return false
 end
 
+-- Check if ALL Faction Headers are Collapsed or not for Repheler "SortByStanding"
+function CheckAllCollapsed_RPH()
+  if RPH_Data and RPH_Data.SortByStanding then
+    if RPH_Entries and RPH_Collapsed then
+      for i=1, #RPH_Entries, 1 do
+        if RPH_Entries[i] and (RPH_Entries[i].header) then
+          local isCollapsed = RPH_Collapsed[RPH_Entries[i].i]
+          if not isCollapsed then
+            return false
+          end
+        end
+      end
+    end
+  end
+  return true
+end
+
 -- Check if ALL Faction Headers are Collapsed or not
 local function CheckAllCollapsed()
   for i=1, NUM_FACTIONS_DISPLAYED, 1 do
-    local name, description, standingID, barMin, barMax, barValue, atWarWith, canToggleAtWar, isHeader, isCollapsed, hasRep, isWatched, isChild, factionID, hasBonusRepGain, canBeLFGBonus = GetFactionInfo(i);
+    --local name, description, standingID, barMin, barMax, barValue, atWarWith, canToggleAtWar, isHeader, isCollapsed, hasRep, isWatched, isChild, factionID, hasBonusRepGain, canBeLFGBonus = GetFactionInfo(i)
+    local isHeader, isCollapsed = select(9, GetFactionInfo(i))
     if isHeader then
       if not isCollapsed then
         return false
@@ -39,14 +57,16 @@ local function CheckAllCollapsed()
   return true
 end
 
--- local variables to check later on
-local collapsed = CheckAllCollapsed()
-
 -- Update Texture from ExpandOrCollapseButtonAll Button
 local function UpdateIconTexture()
-  local button = _G[ButtonName];
+  local button = _G[ButtonName]
   if not button then return end
-	collapsed = CheckAllCollapsed()
+
+  if RPH_Data and RPH_Data.SortByStanding then
+    collapsed = CheckAllCollapsed_RPH()
+  else
+    collapsed = CheckAllCollapsed()
+  end
   if collapsed then
     if ElvUI then
       button:SetNormalTexture(ElvUI[1].Media.Textures.PlusButton)
@@ -62,77 +82,125 @@ local function UpdateIconTexture()
   end
 end
 
+-- OnClick function for our Button
+local function btnOnClick(self)
+  numFactions = GetNumFactions()
+  if RPH_Data and RPH_Data.SortByStanding then
+    collapsed = CheckAllCollapsed_RPH()
+    for i=1, numFactions, 1 do
+      if RPH_Entries[i] and (RPH_Entries[i].header == true) then
+        if collapsed then
+          RPH_Collapsed[RPH_Entries[i].i] = nil
+          RPH_ReputationFrame_Update()
+        else
+          RPH_Collapsed[RPH_Entries[i].i] = true
+          RPH_ReputationFrame_Update()
+        end
+      end
+    end
+  else
+    collapsed = CheckAllCollapsed()
+    for i=1, numFactions, 1 do
+      local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"]
+      local isHeader = select(9, GetFactionInfo(i))
+      if ExpandOrCollapseButton then
+        local index = ExpandOrCollapseButton:GetParent().index
+        local isCollapsed = ExpandOrCollapseButton:GetParent().isCollapsed
+        if (isCollapsed ~= nil) and IsNumeric(index) then
+          if (collapsed) then
+            ExpandFactionHeader(index)
+          else
+            CollapseFactionHeader(index)
+          end
+        end
+      end
+    end
+  end
+  UpdateIconTexture()
+end
+
+--hook the "RPH_OrderByStandingCheckBox" becasue it is possible there are no Repuations visible in "SortByStanding"
+local f = CreateFrame("FRAME")
+f:RegisterEvent("ADDON_LOADED")
+f:SetScript("OnEvent", function(self, event, addon, ...)
+  if event == "ADDON_LOADED" and addon == "RepHelper"then
+    if RPH_OrderByStandingCheckBox then
+      RPH_OrderByStandingCheckBox:HookScript("OnClick", function (self)
+        local button = _G[ButtonName]
+        if not button then return end
+        UpdateIconTexture()
+        if RPH_Data.SortByStanding then
+          if RPH_Entries and (#RPH_Entries == 0) then
+            button:Hide()
+          else
+            button:Show()
+          end
+        else
+          button:Show()
+        end
+      end)
+    end
+  end
+end)
+
 -- Hook OnClick of ReputationBar ExpandOrCollapseButtons if they are Headers
 for i=1, NUM_FACTIONS_DISPLAYED, 1 do
-  local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"];
-  local isHeader = select(9, GetFactionInfo(i));
+  local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"]
+  local isHeader = select(9, GetFactionInfo(i))
   if ExpandOrCollapseButton and isHeader then
     ExpandOrCollapseButton:HookScript("OnClick", function(self)
-      collapsed = CheckAllCollapsed()
       UpdateIconTexture()
     end)
   end
 end
 
--- OnClick function for our Button
-local function btnOnClick(self)
-  for i=1, NUM_FACTIONS_DISPLAYED, 1 do
-    local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"];
-		local isHeader = select(9, GetFactionInfo(i));
-    if ExpandOrCollapseButton and isHeader then
-      local index = ExpandOrCollapseButton:GetParent().index
-      if IsNumeric(index) then
-        if (collapsed) then
-          ExpandFactionHeader(index);
-        else
-          CollapseFactionHeader(index);
-        end
-      end
-    end
-  end
-  collapsed = CheckAllCollapsed()
-  UpdateIconTexture()
-end
+-- local variables to check later on
+local collapsed = CheckAllCollapsed() or false
 
 -- Move ReputationBar1 -23 in Y (default is -68)
 -- the -23 come from "ReputationBarTemplate" Height (20) + Bar spacing (3) like all other bars have
 ReputationListScrollFrame:HookScript("OnShow", function(self)
-  ReputationBar1:SetPoint("TOPRIGHT", ReputationFrame, "TOPRIGHT", -50, -91);
+  ReputationBar1:SetPoint("TOPRIGHT", ReputationFrame, "TOPRIGHT", -50, -91)
 end)
 
 ReputationListScrollFrame:HookScript("OnHide", function(self)
-  ReputationBar1:SetPoint("TOPRIGHT", ReputationFrame, "TOPRIGHT", -26, -91);
+  ReputationBar1:SetPoint("TOPRIGHT", ReputationFrame, "TOPRIGHT", -26, -91)
+end)
+
+ReputationBar15:HookScript("OnShow", function(self)
+  self:Hide()
 end)
 
 -- Hook OnShow of the ReputationFrame for your MAIN function
 ReputationFrame:HookScript("OnShow", function(self)
-  local btn = _G[ButtonName] or CreateFrame("Button", ButtonName, self)
+  local button = _G[ButtonName] or CreateFrame("Button", ButtonName, self)
+  if not button then return end
+  local buttonText = _G[ButtonName.."Text"] or button:CreateFontString(_G[ButtonName.."Text"], "OVERLAY", "GameFontNormal")
+  buttonText:ClearAllPoints()
+  buttonText:SetPoint("LEFT", button, "RIGHT", 3, 0)
+  buttonText:SetText(_G.ALL)
+  button.text = buttonText
 
-  if CollapsOnShow then -- Collapse ALL Factions on
-    for i=1, NUM_FACTIONS_DISPLAYED, 1 do
-      local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"];
+  if CollapsOnShow then -- Collapse ALL Factions on login?
+    numFactions = GetNumFactions()
+    for i=1, numFactions, 1 do
+      local ExpandOrCollapseButton = _G["ReputationBar"..i.."ExpandOrCollapseButton"]
       if (ExpandOrCollapseButton) then
         local index = ExpandOrCollapseButton:GetParent().index
         if IsNumeric(index) then
-          CollapseFactionHeader(index);
+          CollapseFactionHeader(index)
         end
       end
-  end
-  collapsed = CheckAllCollapsed()
+    end
   end
 
-  btn:SetWidth(16)
-  btn:SetHeight(16)
-  btn:ClearAllPoints()
-  btn:SetPoint("LEFT", ReputationBar1, "LEFT", 6, 22);
+  button:ClearAllPoints()
+  button:SetPoint("TOPLEFT", self, "TOPLEFT", 16, -71)
 
-  local btnText = _G[ButtonName.."Text"] or btn:CreateFontString(_G[ButtonName.."Text"], "OVERLAY", "GameFontNormal")
-  btnText:ClearAllPoints()
-  btnText:SetPoint("LEFT", btn, "RIGHT", 3, 0)
-  btnText:SetText(_G.ALL)
-  btn.text = btnText;
+  button:SetWidth(16)
+  button:SetHeight(16)
+  button:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD")
+  button:SetScript("OnClick", btnOnClick)
 
   UpdateIconTexture()
-  btn:SetHighlightTexture("Interface\\Buttons\\UI-PlusButton-Hilight", "ADD");
-  btn:SetScript("OnClick", btnOnClick)
 end)
