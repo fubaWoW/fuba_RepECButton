@@ -1,4 +1,4 @@
-﻿## Interface: 80300
+﻿## Interface: 90002
 ## Title: fuba's |cff0080ffReputation Expand/Collapse Button|r
 ## Version: @project-version@
 ## Author: fuba
